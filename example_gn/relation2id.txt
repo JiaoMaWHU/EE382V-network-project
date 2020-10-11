@@ -1,0 +1,13 @@
+11
+rate0 1
+rate0.5 2
+rate1.0 3
+rate1.5 4
+rate2.0 5
+rate2.5 6
+rate3.0 7
+rate3.5 8
+rate4.0 9
+rate4.5 10
+rate5.0 11
+friend 12
