@@ -1,8 +1,8 @@
-f = open('train2id.txt', 'r')
+f = open('./train2id.txt', 'r')
 
 b_ratings = {}
 
-# _ = f.readline()
+_ = f.readline()
 line = f.readline()
 while line:
 
@@ -10,7 +10,7 @@ while line:
 
     b = int(b)
     rating = int(rating)
-    if b > 9:
+    if rating == 12:
         break
 
     if b not in b_ratings:
