@@ -1,0 +1,10 @@
+9
+rate0 0
+rate1 1
+rate2 2
+rate3 3
+rate4 4
+rate5 5
+irrelevant 6
+posicor 7
+negacor 8
