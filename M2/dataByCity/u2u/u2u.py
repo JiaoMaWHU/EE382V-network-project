@@ -2,8 +2,105 @@ from textblob import TextBlob
 import json
 import statistics
 import numpy as np
+import time
 
-file = "../../../yelp_dataset/yelp_academic_dataset_review.json"
+reviews_file = "../../../yelp_dataset/yelp_academic_dataset_review.json"
+
+
+def build_u2u(city_file, output):
+    start = time.time()
+    city_b_u = {}
+    user_id_set = set()
+    with open(city_file, 'r') as cf:
+        line = cf.readline()
+        for i in range(int(line)):
+            line = cf.readline()
+            res = line.strip().split()
+            bs = res[1]
+            user = res[0]
+            if bs not in city_b_u:
+                city_b_u[bs] = []
+            city_b_u[bs].append(user)
+            user_id_set.add(user)
+
+    required_num = 0
+    for b in city_b_u:
+        un = len(city_b_u[b])
+        required_num += (un * (un - 1)) / 2
+    print("Started, should output {} u2u relations".format(required_num))
+
+    b_md5_id = {}
+    b_md5_set = set()
+    with open('bs_entity2id.txt', 'r') as bs_e2i:
+        line = bs_e2i.readline()
+        for i in range(int(line)):
+            line = bs_e2i.readline()
+            res = line.strip().split()
+            if res[1] in city_b_u:
+                b_md5_id[res[0]] = res[1]
+                b_md5_set.add(res[0])
+
+    u_md5_id = {}
+    with open('user_entity2id.txt', 'r') as ur_e2i:
+        line = ur_e2i.readline()
+        for i in range(int(line)):
+            line = ur_e2i.readline()
+            res = line.strip().split()
+            if res[1] in user_id_set:
+                u_md5_id[res[0]] = res[1]
+
+    b_u_review_map = {}
+    with open(reviews_file, 'r', encoding='utf-8') as reviews:
+        line = reviews.readline()
+        while line:
+            review = json.loads(line)
+            if review['business_id'] in b_md5_set:
+                b_id = b_md5_id[review['business_id']]
+                u_id = u_md5_id[review['user_id']]
+                if not b_id or not u_id:
+                    raise ValueError("id not found")
+                if b_id not in b_u_review_map:
+                    b_u_review_map[b_id] = {}
+                b_u_review_map[b_id][u_id] = review['text']
+            line = reviews.readline()
+
+    print("finish metadata processing, start generation")
+
+    count = 0
+    c1 = 0
+    c2 = 0
+    c3 = 0
+    with open(output, 'w') as u2uf:
+        u2uf.write("{}\n".format(required_num))
+        for b_id in city_b_u:
+            u_list = city_b_u[b_id]
+            for i in range(len(u_list)):
+                for j in range(i + 1, len(u_list)):
+                    sent1 = b_u_review_map[b_id][u_list[i]]
+                    sent2 = b_u_review_map[b_id][u_list[j]]
+                    if not sent1 or not sent2:
+                        raise ValueError('no such review')
+                    relation = sentence_similarity(sent1, sent2)
+                    if relation == 6:
+                        c1 += 1
+                    elif relation == 7:
+                        c2 += 1
+                    else:
+                        c3 +=1
+                    u2uf.write("{} {} {}\n".format(
+                        u_list[i],
+                        u_list[j],
+                        relation
+                    ))
+                    count += 1
+    end = time.time()
+    print("finish generation, {} relations are actually generated".format(count))
+    print("irrelevant: {}, positive: {}, negative: {}".format(c1, c2, c3))
+    print("time elapsed: {} mins".format((end - start) / 60))
+    # with open("./user2user_relation.txt", "r+") as f:
+    #     s = f.read()
+    #     f.seek(0)
+    #     f.write("{}\n".format(count) + s)
 
 
 def sentence_similarity(s1, s2):
@@ -21,7 +118,7 @@ def sentence_similarity(s1, s2):
 
 def analysis_reviews():
     count = 0
-    with open(file, 'r', encoding='utf-8') as reviews:
+    with open(reviews_file, 'r', encoding='utf-8') as reviews:
         scores = []
         for i in range(100000):
             line = reviews.readline()
@@ -68,4 +165,5 @@ def generate_u2u(folder):
 
 
 if __name__ == "__main__":
-    print(sentence_similarity("this restaurant is good", "love this place"))
+    build_u2u('./train2id.txt', "./userrelations.txt")
+    # print(sentence_similarity("this restaurant is good", "love this place"))
