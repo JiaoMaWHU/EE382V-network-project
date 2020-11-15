@@ -23,11 +23,7 @@ def build_u2u(city_file, output):
             city_b_u[bs].append(user)
             user_id_set.add(user)
 
-    required_num = 0
-    for b in city_b_u:
-        un = len(city_b_u[b])
-        required_num += (un * (un - 1)) / 2
-    print("Started, should output {} u2u relations".format(required_num))
+    print("Started...")
 
     b_md5_id = {}
     b_md5_set = set()
@@ -49,7 +45,7 @@ def build_u2u(city_file, output):
             if res[1] in user_id_set:
                 u_md5_id[res[0]] = res[1]
 
-    b_u_review_map = {}
+    b_u_polarity_map = {}
     with open(reviews_file, 'r', encoding='utf-8') as reviews:
         line = reviews.readline()
         while line:
@@ -59,9 +55,10 @@ def build_u2u(city_file, output):
                 u_id = u_md5_id[review['user_id']]
                 if not b_id or not u_id:
                     raise ValueError("id not found")
-                if b_id not in b_u_review_map:
-                    b_u_review_map[b_id] = {}
-                b_u_review_map[b_id][u_id] = review['text']
+                if b_id not in b_u_polarity_map:
+                    b_u_polarity_map[b_id] = {}
+                if not b_u_polarity_map[b_id][u_id]:
+                    b_u_polarity_map[b_id][u_id] = TextBlob(review['text']).sentiment.polarity
             line = reviews.readline()
 
     print("finish metadata processing, start generation")
@@ -71,49 +68,53 @@ def build_u2u(city_file, output):
     c2 = 0
     c3 = 0
     with open(output, 'w') as u2uf:
-        u2uf.write("{}\n".format(required_num))
         for b_id in city_b_u:
             u_list = city_b_u[b_id]
             for i in range(len(u_list)):
                 for j in range(i + 1, len(u_list)):
-                    sent1 = b_u_review_map[b_id][u_list[i]]
-                    sent2 = b_u_review_map[b_id][u_list[j]]
-                    if not sent1 or not sent2:
+                    sp1 = b_u_polarity_map[b_id][u_list[i]]
+                    sp2 = b_u_polarity_map[b_id][u_list[j]]
+                    if not sp1 or not sp2:
+                        print(u_list[i] + " " + u_list[j])
                         raise ValueError('no such review')
-                    relation = sentence_similarity(sent1, sent2)
-                    if relation == 6:
-                        c1 += 1
-                    elif relation == 7:
+                    if sp1 * sp2 < 0:
+                        u2uf.write("{} {} {}\n".format(
+                            u_list[i],
+                            u_list[j],
+                            7
+                        ))  # negative correlation
+                        count += 1
+                        c3 += 1
+                    elif abs(sp1 - sp2) < 0.1:
+                        u2uf.write("{} {} {}\n".format(
+                            u_list[i],
+                            u_list[j],
+                            6
+                        ))  # positive correlation
+                        count += 1
                         c2 += 1
-                    else:
-                        c3 +=1
-                    u2uf.write("{} {} {}\n".format(
-                        u_list[i],
-                        u_list[j],
-                        relation
-                    ))
-                    count += 1
+
     end = time.time()
     print("finish generation, {} relations are actually generated".format(count))
     print("irrelevant: {}, positive: {}, negative: {}".format(c1, c2, c3))
     print("time elapsed: {} mins".format((end - start) / 60))
-    # with open("./user2user_relation.txt", "r+") as f:
-    #     s = f.read()
-    #     f.seek(0)
-    #     f.write("{}\n".format(count) + s)
+
+    with open(output, "r+") as f:
+        s = f.read()
+        f.seek(0)
+        f.write("{}\n".format(count) + s)
 
 
 def sentence_similarity(s1, s2):
     stdev = 0.24
     sp1 = TextBlob(s1).sentiment.polarity
     sp2 = TextBlob(s2).sentiment.polarity
-    print("sp1: {}, sp2: {}".format(sp1, sp2))
     if sp1 * sp2 < 0:
-        return 8  # negative correlation
+        return 7  # negative correlation
     dis = abs(sp1 - sp2)
-    if dis < stdev:
-        return 7  # positive correlation
-    return 6  # irrelevant
+    if dis < 0.1:
+        return 6  # positive correlation
+    return 8  # irrelevant
 
 
 def analysis_reviews():
@@ -165,5 +166,5 @@ def generate_u2u(folder):
 
 
 if __name__ == "__main__":
-    build_u2u('./train2id.txt', "./userrelations.txt")
+    build_u2u('../cities/cleveland/train2id.txt', "../cities/cleveland/userrelations.txt")
     # print(sentence_similarity("this restaurant is good", "love this place"))
