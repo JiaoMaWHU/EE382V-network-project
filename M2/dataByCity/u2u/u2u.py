@@ -19,8 +19,8 @@ def build_u2u(city_file, output):
             bs = res[1]
             user = res[0]
             if bs not in city_b_u:
-                city_b_u[bs] = []
-            city_b_u[bs].append(user)
+                city_b_u[bs] = set()
+            city_b_u[bs].add(user)
             user_id_set.add(user)
 
     print("Started...")
@@ -53,11 +53,9 @@ def build_u2u(city_file, output):
             if review['business_id'] in b_md5_set:
                 b_id = b_md5_id[review['business_id']]
                 u_id = u_md5_id[review['user_id']]
-                if not b_id or not u_id:
-                    raise ValueError("id not found")
                 if b_id not in b_u_polarity_map:
                     b_u_polarity_map[b_id] = {}
-                if not b_u_polarity_map[b_id][u_id]:
+                if u_id not in b_u_polarity_map[b_id]:
                     b_u_polarity_map[b_id][u_id] = TextBlob(review['text']).sentiment.polarity
             line = reviews.readline()
 
@@ -69,15 +67,12 @@ def build_u2u(city_file, output):
     c3 = 0
     with open(output, 'w') as u2uf:
         for b_id in city_b_u:
-            u_list = city_b_u[b_id]
+            u_list = list(city_b_u[b_id])
             for i in range(len(u_list)):
                 for j in range(i + 1, len(u_list)):
                     sp1 = b_u_polarity_map[b_id][u_list[i]]
                     sp2 = b_u_polarity_map[b_id][u_list[j]]
-                    if not sp1 or not sp2:
-                        print(u_list[i] + " " + u_list[j])
-                        raise ValueError('no such review')
-                    if sp1 * sp2 < 0:
+                    if sp1 * sp2 < 0 and abs(sp1 - sp2) > 0.8:
                         u2uf.write("{} {} {}\n".format(
                             u_list[i],
                             u_list[j],
@@ -85,7 +80,7 @@ def build_u2u(city_file, output):
                         ))  # negative correlation
                         count += 1
                         c3 += 1
-                    elif abs(sp1 - sp2) < 0.1:
+                    elif abs(sp1 - sp2) < 0.003:
                         u2uf.write("{} {} {}\n".format(
                             u_list[i],
                             u_list[j],
@@ -166,5 +161,6 @@ def generate_u2u(folder):
 
 
 if __name__ == "__main__":
-    build_u2u('../cities/cleveland/train2id.txt', "../cities/cleveland/userrelations.txt")
+    # build_u2u('../cities/cleveland/train2id.txt', "../cities/cleveland/userrelations.txt")
+    build_u2u('./train2id.txt','./test_output.txt')
     # print(sentence_similarity("this restaurant is good", "love this place"))
