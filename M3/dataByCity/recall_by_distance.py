@@ -27,6 +27,7 @@ def rank(embeddings, sucessful_b_id):
     print('size of success businesses: {}, total sample size: {}, recall rate = {}/{} = {}'.format(
         len(sucessful_b_id), len(sorted_list), count, len(sucessful_b_id), count/len(sucessful_b_id)
     ))
+    return count/len(sucessful_b_id)
 
 def recall(citypath):
     with open(os.path.join(citypath, 'embedding_id.txt'), 'r') as f:
@@ -45,7 +46,10 @@ def recall(citypath):
         lines = f.readlines()
         for line in lines:
             success_id.append(id_lines.index(line.strip().split()[0]))
-    rank(embeddings, success_id)
+    recall_rate = 0
+    for i in range(10):
+        recall_rate += rank(embeddings, success_id)
+    print("10 times avg. recall rate: {}".format(recall_rate/10))
 
 if __name__ == '__main__':
     recall("./cities/folder")
